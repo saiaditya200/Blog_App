@@ -7,8 +7,9 @@ import pic from '../../assets/home.jpeg';
 
 function Home() {
   const { currentUser, setCurrentUser } = useContext(userAuthorContextObj);
-  const { isSignedIn, user, isLoaded } = useUser();
+  const { isSignedIn, user } = useUser();
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   // Memoize endpoint map so it's stable across renders
@@ -18,10 +19,42 @@ function Home() {
     admin: 'http://localhost:3000/admin-api/admin',
   }), []);
 
+  // Update context with Clerk user info, only if different
+  useEffect(() => {
+    if (isSignedIn && user?.emailAddresses?.[0]?.emailAddress) {
+      setCurrentUser(prevUser => {
+        const email = user?.emailAddresses?.[0]?.emailAddress;
+        if (
+          prevUser.firstName === user?.firstName &&
+          prevUser.lastName === user?.lastName &&
+          prevUser.email === email &&
+          prevUser.profileImageUrl === user?.imageUrl
+        ) {
+          return prevUser; // No changes, avoid re-render
+        }
+        return {
+          ...prevUser,
+          firstName: user?.firstName,
+          lastName: user?.lastName,
+          email: email,
+          profileImageUrl: user?.imageUrl,
+        };
+      });
+    }
+  }, [isSignedIn, user, setCurrentUser]);
+
+  // Navigate safely when role is selected and no error
+  useEffect(() => {
+    if (currentUser?.role && currentUser?.email && error.length === 0) {
+      const safeEmail = encodeURIComponent(currentUser.email);
+      navigate(`/${currentUser.role}-profile/${safeEmail}`);
+    }
+  }, [currentUser, error.length, navigate]);
+
   async function onSelectRole(e) {
     setError('');
+    setLoading(true);
     const selectedRole = e.target.value;
-    // Avoid direct mutation of context object
     const updatedUser = { ...currentUser, role: selectedRole };
 
     try {
@@ -29,38 +62,17 @@ function Home() {
       const { message, payload } = res.data;
 
       if (message === selectedRole) {
-        setCurrentUser({ ...updatedUser, ...payload });
+        setCurrentUser(prevUser => ({ ...prevUser, ...updatedUser, ...payload }));
         localStorage.setItem('currentuser', JSON.stringify(payload));
       } else {
         setError(message);
       }
     } catch (err) {
       setError(err.message);
+    } finally {
+      setLoading(false);
     }
   }
-
-  useEffect(() => {
-    if (
-      isSignedIn &&
-      user?.emailAddresses?.[0]?.emailAddress // guard against undefined
-    ) {
-      setCurrentUser({
-        ...currentUser,
-        firstName: user?.firstName,
-        lastName: user?.lastName,
-        email: user?.emailAddresses?.[0]?.emailAddress,
-        profileImageUrl: user?.imageUrl,
-      });
-    }
-    // Only run when user or isSignedIn changes
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isSignedIn, user]);
-
-  useEffect(() => {
-    if (currentUser?.role && error.length === 0) {
-      navigate(`/${currentUser.role}-profile/${currentUser.email}`);
-    }
-  }, [currentUser, error.length, navigate]);
 
   // Loading guard for signed-in user
   if (isSignedIn && !user?.emailAddresses) {
@@ -111,6 +123,7 @@ function Home() {
                   className="form-check-input"
                   onChange={onSelectRole}
                   checked={currentUser?.role === role}
+                  disabled={loading}
                 />
                 <label htmlFor={role} className="form-check-label text-capitalize">
                   {role}
