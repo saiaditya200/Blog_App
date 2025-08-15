@@ -13,7 +13,7 @@ async function createUserOrAuthor(req, res) {
         if (newUserAuthor.role === userInDb.role) {
             res.status(200).send({ message: newUserAuthor.role, payload: userInDb });
         } else {
-            res.status(200).send({ message: "Invalid role" });
+            res.status(400).send({ message: "Invalid role" }); // Changed to 400 Bad Request
         }
     } else {
         // Create new user or author

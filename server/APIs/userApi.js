@@ -2,8 +2,8 @@ const exp = require("express");
 const userApp = exp.Router();
 const UserAuthor = require("../models/userAuthorModel");
 const expressAsyncHandler = require("express-async-handler");
-const createUserOrAuthor = require("./createUserOrAuthor")
-const Article = require("../models/articleModel")
+const createUserOrAuthor = require("./createUserOrAuthor");
+const Article = require("../models/articleModel");
 
 // API
 
@@ -14,17 +14,16 @@ userApp.post("/user", expressAsyncHandler(createUserOrAuthor));
 userApp.put('/comment/:articleId', expressAsyncHandler(async (req, res) => {
     //get comment obj
     const CommentObj = req.body;
-    console.log(CommentObj,req.params.articleId);
 
     //add comment object to comments array of article
     const articleWithComments = await Article.findOneAndUpdate(
-        { articleId: req.params.articleId },
+        { _id: req.params.articleId }, // Use _id for lookup
         { $push: { comments: CommentObj } },
-        { returnOriginal:false })
+        { new: true } // Use new for updated doc
+    );
 
-        console.log(articleWithComments)
     //send res
     res.send({ message: "comment added", payload: articleWithComments });
-}))
+}));
 
 module.exports = userApp;
